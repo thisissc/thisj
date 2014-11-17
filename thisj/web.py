@@ -47,9 +47,10 @@ class BaseHandler:
 
 
 class Application(web.Application):
-    def __init__(self, tplpath='templates', handlers=None):
+    def __init__(self, tplpath='templates', staticprefix='/s', staticpath='static', handlers=None):
         router = _SimpleRouter()
         router.add_handlers(handlers)
+        router.add_static(staticprefix, staticpath)
         _JinjaEnv.init(tplpath)
 
         super(Application, self).__init__(router=router)
