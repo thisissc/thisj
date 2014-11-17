@@ -68,11 +68,12 @@ class _SimpleRouter(web.UrlDispatcher):
     @asyncio.coroutine
     def resolve(self, request):
         match_info = yield from super(_SimpleRouter, self).resolve(request)
-        handler = match_info.handler
-        handler = handler()
-        handler = getattr(handler, request.method.lower())
-        _entry = match_info._entry
-        match_info._entry = web.Entry(_entry.regex, _entry.method, handler)
+        if not request.path.startswith('/s/'): # FIXME: start with /s/, shoud be a var str
+            handler = match_info.handler
+            handler = handler()
+            handler = getattr(handler, request.method.lower())
+            _entry = match_info._entry
+            match_info._entry = web.Entry(_entry.regex, _entry.method, handler)
         return match_info
 
 
