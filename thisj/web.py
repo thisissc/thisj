@@ -73,7 +73,7 @@ class _SimpleRouter(web.UrlDispatcher):
             handler = handler()
             handler = getattr(handler, request.method.lower())
             _entry = match_info._entry
-            match_info._entry = web.Entry(_entry.regex, _entry.method, handler)
+            match_info._entry = web.Entry(_entry.regex, _entry.method, handler, _entry.endpoint, _entry.path, _entry.type)
         return match_info
 
 
