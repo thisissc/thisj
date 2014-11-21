@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+from aiohttp import abc
 from aiohttp import web
 from jinja2 import Environment
 from jinja2 import FileSystemLoader
@@ -56,6 +57,15 @@ class Application(web.Application):
         super(Application, self).__init__(router=router)
 
 
+class _SimpleMatchInfo(abc.AbstractMatchInfo):
+    def __init__(self, handler):
+        self._handler = handler
+
+    @property
+    def handler(self):
+        return self._handler
+
+
 class _SimpleRouter(web.UrlDispatcher):
     def add_handler(self, method, pattern, handler):
         self.add_route(method.upper(), pattern, handler)
@@ -72,8 +82,7 @@ class _SimpleRouter(web.UrlDispatcher):
             handler = match_info.handler
             handler = handler()
             handler = getattr(handler, request.method.lower())
-            _entry = match_info._entry
-            match_info._entry = web.Entry(_entry.regex, _entry.method, handler, _entry.endpoint, _entry.path, _entry.type)
+            match_info = _SimpleMatchInfo(handler)
         return match_info
 
 
