@@ -1,2 +1,2 @@
-aiohttp==0.10.2a
+aiohttp
 Jinja2
