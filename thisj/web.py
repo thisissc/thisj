@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import re
 import asyncio
 from aiohttp import abc
 from aiohttp import web
@@ -48,10 +49,9 @@ class BaseHandler:
 
 
 class Application(web.Application):
-    def __init__(self, tplpath='templates', staticprefix='/s', staticpath='static', handlers=None):
+    def __init__(self, tplpath='templates', handlers=None):
         router = _SimpleRouter()
         router.add_handlers(handlers)
-        router.add_static(staticprefix, staticpath)
         _JinjaEnv.init(tplpath)
 
         super(Application, self).__init__(router=router)
@@ -66,24 +66,39 @@ class _SimpleMatchInfo(abc.AbstractMatchInfo):
         return self._handler
 
 
-class _SimpleRouter(web.UrlDispatcher):
-    def add_handler(self, method, pattern, handler):
-        self.add_route(method.upper(), pattern, handler)
+class _SimpleRouter(abc.AbstractRouter):
+    def __init__(self):
+        super(_SimpleRouter, self).__init__()
+        self._handlers = []
 
-    def add_handlers(self, handler_list):
-        if handler_list:
-            for method, pattern, handler in handler_list:
-                self.add_handler(method, pattern, handler)
+    def add_handlers(self, handlers):
+        for p, h in handlers:
+            self.add_handler(p, h)
+
+    def add_handler(self, pattern, handler):
+        if not pattern.endswith('$'):
+            pattern += '$'
+        prog = re.compile(pattern)
+        self._handlers.append((prog, handler))
 
     @asyncio.coroutine
     def resolve(self, request):
-        match_info = yield from super(_SimpleRouter, self).resolve(request)
-        if not request.path.startswith('/s/'): # FIXME: start with /s/, shoud be a var str
-            handler = match_info.handler
-            handler = handler()
-            handler = getattr(handler, request.method.lower())
-            match_info = _SimpleMatchInfo(handler)
-        return match_info
+        path = request.path
+        method = request.method
+
+        for prog, handler_class in self._handlers:
+            match = prog.match(path)
+            if match:
+                handler = handler_class()
+                handler = getattr(handler, method.lower())
+
+                if handler:
+                    match_info = _SimpleMatchInfo(handler)
+                    return match_info
+                else:
+                    raise web.HTTPMethodNotAllowed(request, method, []) # TODO: allowed_method is empty
+
+        raise web.HTTPNotFound(request)
 
 
 class _JinjaEnv:

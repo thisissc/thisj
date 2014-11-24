@@ -10,7 +10,7 @@ class HelloHandler(web.BaseHandler):
         return self.render('hello.html', name='WORLD')
 
 urls = [
-    ('GET', '/', HelloHandler),
+    ('/hello', HelloHandler),
 ]
 
 def main():
