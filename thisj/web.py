@@ -5,11 +5,14 @@ import asyncio
 import mimetypes
 import os.path
 import re
+import sys
 import urllib.parse
 from aiohttp import abc
 from aiohttp import web
+from aiohttp import protocol
 from jinja2 import Environment
 from jinja2 import FileSystemLoader
+import thisj
 
 
 class BaseHandler:
@@ -69,6 +72,7 @@ class StaticFileHandler(BaseHandler):
         ct = ct or 'application/octet-stream'
         resp.content_type = ct
         resp.headers['transfer-encoding'] = 'chunked'
+        print(resp.headers)
         resp.send_headers()
 
         with open(path, 'rb') as f:
@@ -88,6 +92,7 @@ class StaticFileHandler(BaseHandler):
 
 class Application(web.Application):
     def __init__(self, tplpath='templates', handlers=None):
+        protocol.HttpMessage.SERVER_SOFTWARE = 'Python/{0[0]}.{0[1]} aiohttp/{1}'.format(sys.version_info, thisj.__version__)
         router = _SimpleRouter()
         router.add_handlers(handlers)
         _JinjaEnv.init(tplpath)
