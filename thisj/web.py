@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import urllib.parse
 import re
 import asyncio
 from aiohttp import abc
@@ -21,16 +22,18 @@ class BaseHandler:
         fn = getattr(self, method, None)
         
         if fn:
-            def _f(request, *args, **kwargs):
-                self._request = request
-                body = fn(*args, **kwargs)
-                if isinstance(body, str):
-                    body = body.encode('utf-8')
-                self.response.body = body
-                return self.response
+            def _tmp_f(*args, **kwargs):
+                def _f(request):
+                    self._request = request
+                    body = fn(*args, **kwargs)
+                    if isinstance(body, str):
+                        body = body.encode('utf-8')
+                    self.response.body = body
+                    return self.response
 
-            _f = asyncio.coroutine(_f)
-            setattr(self, method, _f)
+                _f = asyncio.coroutine(_f)
+                return _f
+            setattr(self, method, _tmp_f)
 
     @property
     def request(self):
@@ -93,6 +96,8 @@ class _SimpleRouter(abc.AbstractRouter):
                 handler = getattr(handler, method.lower())
 
                 if handler:
+                    args = [urllib.parse.unquote(x) for x in match.groups()]
+                    handler = handler(*args)
                     match_info = _SimpleMatchInfo(handler)
                     return match_info
                 else:
