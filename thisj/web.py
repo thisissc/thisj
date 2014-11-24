@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import urllib.parse
-import re
 import asyncio
+import mimetypes
+import os.path
+import re
+import urllib.parse
 from aiohttp import abc
 from aiohttp import web
 from jinja2 import Environment
@@ -51,6 +53,39 @@ class BaseHandler:
         return template.render(**data)
 
 
+class StaticFileHandler(BaseHandler):
+    def __init__(self, staticpath='static/'):
+        if staticpath.startswith('/'):
+            staticpath = staticpath[1:]
+        staticpath = os.path.abspath(staticpath)
+        self._staticpath = staticpath
+        super(StaticFileHandler, self).__init__()
+
+    def get(self, filename):
+        resp = self.response
+        path = os.path.join(self._staticpath, filename)
+
+        ct = mimetypes.guess_type(filename)[0]
+        ct = ct or 'application/octet-stream'
+        resp.content_type = ct
+        resp.headers['transfer-encoding'] = 'chunked'
+        resp.send_headers()
+
+        with open(path, 'rb') as f:
+            chunk = f.read(1024)
+            while chunk:
+                resp.write(chunk)
+                chunk = f.read(1024)
+
+        return ''
+
+    @property
+    def response(self):
+        if self._response is None:
+            self._response = web.StreamResponse(self.request)
+        return self._response
+
+
 class Application(web.Application):
     def __init__(self, tplpath='templates', handlers=None):
         router = _SimpleRouter()
@@ -75,24 +110,24 @@ class _SimpleRouter(abc.AbstractRouter):
         self._handlers = []
 
     def add_handlers(self, handlers):
-        for p, h in handlers:
-            self.add_handler(p, h)
+        for item in handlers:
+            self.add_handler(*item)
 
-    def add_handler(self, pattern, handler):
+    def add_handler(self, pattern, handler, *args, **kwargs):
         if not pattern.endswith('$'):
             pattern += '$'
         prog = re.compile(pattern)
-        self._handlers.append((prog, handler))
+        self._handlers.append((prog, handler, args, kwargs))
 
     @asyncio.coroutine
     def resolve(self, request):
         path = request.path
         method = request.method
 
-        for prog, handler_class in self._handlers:
+        for prog, handler_class, args, kwargs in self._handlers:
             match = prog.match(path)
             if match:
-                handler = handler_class()
+                handler = handler_class(*args, **kwargs)
                 handler = getattr(handler, method.lower())
 
                 if handler:
