@@ -72,7 +72,6 @@ class StaticFileHandler(BaseHandler):
         ct = ct or 'application/octet-stream'
         resp.content_type = ct
         resp.headers['transfer-encoding'] = 'chunked'
-        print(resp.headers)
         resp.send_headers()
 
         with open(path, 'rb') as f:
