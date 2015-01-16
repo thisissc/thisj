@@ -17,28 +17,10 @@ import thisj
 
 class BaseHandler:
     def __init__(self):
-        self._deco_method('get')
-        self._deco_method('post')
-
         self._request = None
         self._response = None
-
-    def _deco_method(self, method):
-        fn = getattr(self, method, None)
-        
-        if fn:
-            def _tmp_f(*args, **kwargs):
-                def _f(request):
-                    self._request = request
-                    body = fn(*args, **kwargs)
-                    if isinstance(body, str):
-                        body = body.encode('utf-8')
-                    self.response.body = body
-                    return self.response
-
-                _f = asyncio.coroutine(_f)
-                return _f
-            setattr(self, method, _tmp_f)
+        self._args = []
+        self._kwargs = {}
 
     @property
     def request(self):
@@ -47,13 +29,32 @@ class BaseHandler:
     @property
     def response(self):
         if self._response is None:
-            self._response = web.Response(self._request)
+            self._response = web.Response()
+            self._response.content_type = 'text/html'
         return self._response
 
     def render(self, tpl, **data):
         env = _JinjaEnv.instance()
         template = env.get_template(tpl)
         return template.render(**data)
+
+    def set_handler_args(self, *args, **kwargs):
+        self._args = args
+        self._kwargs = kwargs
+
+    @asyncio.coroutine
+    def __call__(self, request):
+        self._request = request
+
+        method = request.method
+        handler = getattr(self, method.lower(), None)
+
+        if handler:
+            body = handler(*self._args, **self._kwargs)
+            self.response.text = body
+            return self.response
+        else:
+            raise web.HTTPMethodNotAllowed(method, []) # TODO: second paramter "allowed_method" is empty
 
 
 class StaticFileHandler(BaseHandler):
@@ -68,24 +69,27 @@ class StaticFileHandler(BaseHandler):
         resp = self.response
         path = os.path.join(self._staticpath, filename)
 
-        ct = mimetypes.guess_type(filename)[0]
-        ct = ct or 'application/octet-stream'
-        resp.content_type = ct
-        resp.headers['transfer-encoding'] = 'chunked'
-        resp.send_headers()
+        if os.path.exists(path):
+            ct = mimetypes.guess_type(filename)[0]
+            ct = ct or 'application/octet-stream'
+            resp.content_type = ct
+            resp.enable_chunked_encoding(1024)
 
-        with open(path, 'rb') as f:
-            chunk = f.read(1024)
-            while chunk:
-                resp.write(chunk)
+            resp.start(self.request)
+            with open(path, 'rb') as f:
                 chunk = f.read(1024)
+                while chunk:
+                    resp.write(chunk)
+                    chunk = f.read(1024)
 
-        return ''
+            return ''
+        else:
+            raise web.HTTPNotFound()
 
     @property
     def response(self):
         if self._response is None:
-            self._response = web.StreamResponse(self.request)
+            self._response = web.StreamResponse()
         return self._response
 
 
@@ -132,17 +136,12 @@ class _SimpleRouter(abc.AbstractRouter):
             match = prog.match(path)
             if match:
                 handler = handler_class(*args, **kwargs)
-                handler = getattr(handler, method.lower())
+                handler_args = [urllib.parse.unquote(x) for x in match.groups()]
+                handler.set_handler_args(*handler_args)
+                match_info = _SimpleMatchInfo(handler)
+                return match_info
 
-                if handler:
-                    args = [urllib.parse.unquote(x) for x in match.groups()]
-                    handler = handler(*args)
-                    match_info = _SimpleMatchInfo(handler)
-                    return match_info
-                else:
-                    raise web.HTTPMethodNotAllowed(request, method, []) # TODO: allowed_method is empty
-
-        raise web.HTTPNotFound(request)
+        raise web.HTTPNotFound()
 
 
 class _JinjaEnv:

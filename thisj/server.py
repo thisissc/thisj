@@ -26,7 +26,7 @@ def serve(app):
     logger.init_logger(args.loglvl, args.logfile, args.debug)
 
     loop = asyncio.get_event_loop()
-    coro = loop.create_server(app.make_handler, args.host, args.port)
+    coro = loop.create_server(app.make_handler(), args.host, args.port)
 
     if args.debug:
         tasks = [
