@@ -95,7 +95,7 @@ class StaticFileHandler(BaseHandler):
 
 class Application(web.Application):
     def __init__(self, tplpath='templates', handlers=None):
-        protocol.HttpMessage.SERVER_SOFTWARE = 'Python/{0[0]}.{0[1]} aiohttp/{1}'.format(sys.version_info, thisj.__version__)
+        protocol.HttpMessage.SERVER_SOFTWARE = 'thisj/{1}'.format(sys.version_info, thisj.__version__)
         router = _SimpleRouter()
         router.add_handlers(handlers)
         _JinjaEnv.init(tplpath)
