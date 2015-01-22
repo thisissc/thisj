@@ -18,7 +18,7 @@ def init_logger(loglevel='error', logfile=None, debug=False):
     if debug or not logfile:
         handler = logging.StreamHandler()
     else:
-        handler = logging.handlers.RotatingFileHandler(logfile, maxBytes=10000000)
+        handler = logging.handlers.TimedRotatingFileHandler(logfile, when='midnight')
         
     handler.setFormatter(formatter)
     handler.setLevel(loglevel)
