@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+import logging
 import mimetypes
 import os.path
 import re
@@ -51,6 +52,8 @@ class BaseHandler:
 
         if handler:
             body = handler(*self._args, **self._kwargs)
+            if hasattr(body, '__next__'):
+                body = yield from body
             self.response.text = body
             return self.response
         else:
