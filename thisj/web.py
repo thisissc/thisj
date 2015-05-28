@@ -39,6 +39,9 @@ class BaseHandler:
         template = env.get_template(tpl)
         return template.render(**data)
 
+    def redirect(self, location):
+        raise web.HTTPFound(location)
+
     def set_handler_args(self, *args, **kwargs):
         self._args = args
         self._kwargs = kwargs
